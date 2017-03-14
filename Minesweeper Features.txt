@@ -1,0 +1,42 @@
+﻿Features for minesweeper: # non GUI
+
+cell states ( underneath ):
+	no neibors ( opens all neighbors )
+	1-8 neighbors
+	mine
+visible cell states:
+	unknown
+	flagged # dont think i need a "?" state
+	Showing state # shows cell state. bombs game if is mine
+	
+game states:
+	Nothing
+	Created board
+	Game started # timer, mine countdown, etc
+	Explosion
+	Win # Timer? High Score?
+
+Grid:
+	random put x mines in grid
+		# findout if winmine uses some specific algorithm
+	can change cell state arbitrarity, recompute neighbors
+	Customizable grid size (x, y)
+	Customizable mines in the grid
+
+Scoreing:
+	Mines correctly identified - incorrect
+	cells opened before boom
+
+AI:
+	Either rule based or nueral/genetic network?
+		nueral run same algorithm against many random grids
+	Can help player during game OR play own game
+
+Gameplay:
+	Player can see arbitrary size grid
+		numbers, unknown, flagged
+	Can flag grid based on x, y coor
+	Can open a cell based on x, y coor
+		Will boom or reveal cell
+		Boom = get score, new game
+		If cell 0 then open all neighbor cells
