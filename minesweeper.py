@@ -2,12 +2,18 @@
 
 import random
 import numpy as np
+from enum import Enum
 
 class WrongException(Exception):
 	pass
 
+class Visibility(Enum):
+	hidden = 0
+	flag = 1
+	visible = 2
+
 class Cell(object):
-	def __init__(self, is_mine=None, neighbors=None, is_hidden=None):
+	def __init__(self, is_mine=, neighbors=None, visible=None):
 		if is_mine is None:
 			self._is_mine = None
 		else:
@@ -18,10 +24,15 @@ class Cell(object):
 		else:
 			self.neighbors = neighbors # will go through setter
 
-		if is_hidden is None:
-			self._is_hidden = None
+		if visible is None:
+			self._visible = None
 		else:
-			self.is_hidden = is_hidden
+			self._visible = visible
+
+	def __bool__(self):
+		return self.is_mine
+
+	__nonzero__ = __bool__
 
 	@property
 	def neighbors(self):
@@ -35,14 +46,14 @@ class Cell(object):
 			raise ValueError('Neighbors must be between 0 and 8')
 
 	@property
-	def is_hidden(self):
-		return self._is_hidden
-	@is_hidden.setter
-	def is_hidden(self, value):
-		if value is None:
-			raise ValueError('Must not be None. Must be 0, 1, or 2.')
+	def visible(self):
+		return self._visible
+	@visible.setter
+	def visible(self, value):
+		#if (isinstance(value, Visibility) is False) or (value is None):
+		#	raise ValueError('Must be instance of Visibility enum')
 
-		self._is_hidden = bool(value)
+		self._visible = Visibility(value) # automatically does checking for Visibility.x or 1, 2, 3
 
 	@property
 	def is_mine(self):
@@ -55,9 +66,10 @@ class Cell(object):
 
 
 class Grid(object):
+	USE_CELL = True
 	def __init__(self, mines):
 		try:
-			self._mines, self.x_size, self.y_size = self._parse_args(mines)
+			self._grid, self.x_size, self.y_size = self._parse_args(mines)
 		except (AssertionError, WrongException):
 			raise TypeError("Sorry, mines didn't parse correctly.")
 
@@ -106,8 +118,13 @@ class Grid(object):
 		for x in mines:
 			assert len(x) == y_size, "Not same length"
 
-		return mines, x_size, y_size
+		#if Grid.USE_CELL:
+		for x in range(x_size):
+			for y in range(y_size):
+				mines[x][y] = Cell(mines[x][y], None, None)
 
+		return mines, x_size, y_size
+	'''
 	@property
 	def mines(self):
 		return self._mines
@@ -121,6 +138,10 @@ class Grid(object):
 	@property
 	def grid(self):
 		return self._grid
+	'''
+
+	def grid(self, x, y):
+		return self._grid[x][y]
 
 	# @property
 	def _str_1margin(self):
@@ -177,6 +198,7 @@ class Grid(object):
 	__repr__ = __str__
 
 	def reindex(self):
+		''' # from before Cell
 		grid = ()
 		for x in range(self.x_size):
 			# print('x=%s'%str(x))
@@ -201,10 +223,16 @@ class Grid(object):
 		# print('end reindex')
 		# print(grid)
 		self._grid = grid
+		'''
+
+		for x in range(self.x_size):
+			for y in range(self.x_size):
+				if not self.grid(x, y):
+					self.grid(x, y).neighbors = self.get_neighbors(x, y)
 
 	def get_neighbors(self, x, y) -> list:
 		# print('get')
-		assert self.mines[x][y] in (-1, 0)
+		#assert self.mines[x][y] in (-1, 0)
 
 		neighbors = 0
 
@@ -225,7 +253,8 @@ class Grid(object):
 					#					will wrap-around uninentionally
 					#					so stop it from happening
 
-					neighbor = self.mines[X][Y]
+					#neighbor = self.mines[X][Y]
+					neighbor = self.grid(x, y)
 					neighbors += bool(neighbor)
 				except IndexError:
 					# We are on edge or corner, so no cell here
