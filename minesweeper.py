@@ -11,6 +11,10 @@ class Visibility(Enum):
 	hidden = 0
 	flag = 1
 	visible = 2
+	
+	open = visible
+	flagged = flag
+	unopened = hidden
 
 class Cell(object):
 	def __init__(self, is_mine=, neighbors=None, visible=None):
@@ -341,8 +345,58 @@ class Game(object):
 
 		self.mask = Grid(self.grid.mines) # Create copy
 
+class Move(object):
+	def __init__(self, move_type, x, y):
+		self.type = MoveType(move_type)
+		x, y = int(x), int(y)
+		if (x < 0) or (y < 0):
+			raise ValueError('Out of range ints')
+		self.x, self.y = x, y
+	
+	def apply(self, grid):
+		if not isinstance(grid, Grid):
+			raise TypeError('grid must be type Grid')
+		if (self.x >= grid.x_size) or (self.y >= grid.y_size):
+			raise ValueError('Coordinates out of bounds for Grid')
+		
+		cell = grid.grid(self.x, self.y)
+		
+		if self.type == MoveType.open:
+			cell.visible = Visibility.visible
+			if cell.is_mine:
+				raise Explosion(x, y)
+		elif self.type == MoveType.flag:
+			if cell.visible == Visibility.open:
+				return # invalid command. Cannot flag if opened
+			elif cell.visible == Visibility.flagged: # unflag if flagged
+				cell.visible = Visibility.hidden
+			elif cell.visible == Visibility.hidden:
+				cell.visible = Visibility.flag
+			else:
+				raise NotImplementedError()
+		else:
+			raise NotImplementedError()
+		return
+				
+
+class Explosion(Exception):
+	def __init__(self, x, y, *a, **k):
+		self.x, self.y = x, y
+		super().__init__(*a, **k)
+
+class MoveType(Enum):
+	open = 1
+	flag = 2
+	#unflag = 3
+
 class Player(object):
-	pass
+	def __init__(self):
+		pass
+	
+	def move(self, grid):
+		if not isinstance(grid, Grid):
+			raise TypeError()
+		
 
 '''
 def main():
