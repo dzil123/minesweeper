@@ -17,7 +17,7 @@ class Visibility(Enum):
 	unopened = hidden
 
 class Cell(object):
-	def __init__(self, is_mine=, neighbors=None, visible=None):
+	def __init__(self, is_mine, neighbors=None, visible=None):
 		if is_mine is None:
 			self._is_mine = None
 		else:
@@ -144,7 +144,9 @@ class Grid(object):
 		return self._grid
 	'''
 
-	def grid(self, x, y):
+	def grid(self, x=None, y=None):
+		if None in (x, y):
+			return self._grid
 		return self._grid[x][y]
 
 	# @property
@@ -158,7 +160,7 @@ class Grid(object):
 			for y in range(self.y_size):
 				# print(y)
 				s += '| '
-				now = self.grid[x][y]
+				now = self.grid(x, y)
 				if now is -1:
 					s += 'X'
 				elif now is 0:
@@ -181,7 +183,7 @@ class Grid(object):
 			for y in range(self.y_size):
 				# print(y)
 				s += '|'
-				now = self.grid[x][y]
+				now = self.grid(x, y)
 				if now is -1:
 					s += 'X'
 				elif now is 0:
@@ -195,7 +197,7 @@ class Grid(object):
 		return s  # [:-1]
 
 	def _str_numpy(self):
-		return str(np.array(self.grid))
+		return str(np.array(self.grid()))
 
 	__str__ = _str_0margin
 
@@ -265,7 +267,7 @@ class Grid(object):
 					pass
 
 		return neighbors
-
+'''
 class Mask(object):
 	def __init__(self, grid):
 		assert isinstance(grid, Grid)
@@ -284,7 +286,7 @@ class Mask(object):
 	@property
 	def mask(self):
 		return self._grid
-
+'''
 def get_random() -> random.Random: # assume random module is imported as random
 	return random.random.__self__ # __self__ gets instance a bound method belongs to. Basically, get default random.Random()
 
@@ -430,7 +432,7 @@ def main():
 
 		for x in range(3):
 			g = Grid(r.next())
-			print(np.array(g.grid))
+			print(np.array(g.grid()))
 			print()
 
 if __name__ == "__main__":
