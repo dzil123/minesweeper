@@ -17,11 +17,13 @@ class Visibility(Enum):
 	unopened = hidden
 
 class Cell(object):
+	MINE_STR = 'X'
+	ZERO_STR = ' '
 	def __init__(self, is_mine, neighbors=None, visible=None):
-		if is_mine is None:
-			self._is_mine = None
-		else:
-			self.is_mine = is_mine
+		#if is_mine is None:
+		#	self._is_mine = None
+		#else:
+		self.is_mine = is_mine
 
 		if neighbors is None:
 			self._neighbors = None
@@ -37,6 +39,19 @@ class Cell(object):
 		return self.is_mine
 
 	__nonzero__ = __bool__
+
+	def __str__(self):
+		if self.is_mine:
+			return Cell.MINE_STR
+		if self.neighbors is None:
+			error = NotImplementedError('Incorrectly initialized Cell')
+			#error.x, error.y = self. #oops cells dont have their x, y
+			raise error
+		if self.neighbors is 0:
+			return Cell.ZERO_STR
+		return str(self.neighbors)
+
+	__repr__ = __str__
 
 	@property
 	def neighbors(self):
@@ -73,7 +88,7 @@ class Grid(object):
 	USE_CELL = True
 	def __init__(self, mines):
 		try:
-			self._grid, self.x_size, self.y_size = self._parse_args(mines)
+			self._mines, self._grid, self.x_size, self.y_size = self._parse_args(mines)
 		except (AssertionError, WrongException):
 			raise TypeError("Sorry, mines didn't parse correctly.")
 
@@ -86,8 +101,8 @@ class Grid(object):
 	@staticmethod
 	def _parse_args(mines):
 		try:
-			mines = tuple(mines)
-			mines = tuple(
+			mines = list(mines)
+			'''mines = tuple(
 				[
 					tuple(
 						[
@@ -96,21 +111,22 @@ class Grid(object):
 					)
 					for x in mines
 					]
-			)
+			)'''
+			mines = [[bool(y) for y in x] for x in mines]
 		except TypeError:
 			raise WrongException('TypeError on parsing mines.')
 
 		# ok so now is 2d tuple of True, False
 		# check to see if same dimensions
 
-		assert isinstance(mines, tuple), "Not a tuple"
+		assert isinstance(mines, list), "Not a tuple"
 
 		# print(mines)
 
 		x_size = len(mines)
 
 		for x in mines:
-			assert isinstance(x, tuple), "Not a tuple"
+			assert isinstance(x, list), "Not a list"
 			for y in x:
 				assert isinstance(y, bool), "Not a bool %s" % str(y)
 
@@ -121,18 +137,22 @@ class Grid(object):
 
 		for x in mines:
 			assert len(x) == y_size, "Not same length"
-
+		#grid = mines[:]
+		grid = [[None]*y_size]*x_size
 		#if Grid.USE_CELL:
-		for x in range(x_size):
+		for x in range(x_size): # TODO FIXME THE BUG IS HERE
 			for y in range(y_size):
-				mines[x][y] = Cell(mines[x][y], None, None)
+				temp = mines[x][y]
+				temp = bool(temp)
+				temp = Cell(temp, None, None)
+				grid[x][y] = temp
 
-		return mines, x_size, y_size
-	'''
+		return mines, grid, x_size, y_size
+	#'''
 	@property
 	def mines(self):
 		return self._mines
-
+	'''
 	@mines.setter
 	def mines(self, value):
 		return self.__class__(value)  # return new instance instead of change self
@@ -199,7 +219,34 @@ class Grid(object):
 	def _str_numpy(self):
 		return str(np.array(self.grid()))
 
-	__str__ = _str_0margin
+	def _str_cell_numpy(self):
+		'''#return str(np.array([[('X' for y in x if (y.neighbors == None) else y.neighbors)] for x in self.grid()]))
+		return str(
+			np.array(
+				[
+					[
+						#'X' if self.mines[x, y] else
+						#	(
+						#		' ' if not self.grid(x, y).neighbors else self.grid(x, y).neighbors
+						#	)
+						self.grid(x, y)
+					for y in range(self.y_size)  ]
+				for x in range(self.x_size)  ]
+			)
+		)
+		#return str(np.array([[str(y) for y in x] for x in self.grid()]))'''
+		s = []
+		for x in self.grid():
+			row = []
+			for y in x:
+				row.append(str(y))
+			s.append(row)
+
+		s = str(s)
+		return s
+
+
+	__str__ = _str_cell_numpy
 
 	__repr__ = __str__
 
@@ -233,7 +280,7 @@ class Grid(object):
 
 		for x in range(self.x_size):
 			for y in range(self.x_size):
-				if not self.grid(x, y):
+				if not self.grid(x, y).is_mine:
 					self.grid(x, y).neighbors = self.get_neighbors(x, y)
 
 	def get_neighbors(self, x, y) -> list:
@@ -260,7 +307,7 @@ class Grid(object):
 					#					so stop it from happening
 
 					#neighbor = self.mines[X][Y]
-					neighbor = self.grid(x, y)
+					neighbor = self.grid(X, Y).is_mine
 					neighbors += bool(neighbor)
 				except IndexError:
 					# We are on edge or corner, so no cell here
@@ -366,7 +413,7 @@ class Move(object):
 		if self.type == MoveType.open:
 			cell.visible = Visibility.visible
 			if cell.is_mine:
-				raise Explosion(x, y)
+				raise Explosion(self.x, self.y)
 		elif self.type == MoveType.flag:
 			if cell.visible == Visibility.open:
 				return # invalid command. Cannot flag if opened
@@ -425,15 +472,17 @@ def main():
 	#g = Grid(randomize(9,9,10))
 
 	while True:
-		i = input("? ")
-		i = int(i)
+		#i = input("? ")
+		#i = int(i)
 
-		r = RandomGridGenerator(9, 9, 10, state=i)
+		#r = RandomGridGenerator(9, 9, 10, state=10)
 
-		for x in range(3):
-			g = Grid(r.next())
-			print(np.array(g.grid()))
-			print()
+		#for x in range(3):
+		#g = Grid(r.next())			#print(np.array(g.grid()))
+		g = Grid([[0,0,1,0],[1,1,0,0],[0,0,0,0],[1,0,0,1]])
+		print(g)
+		print()
+		break
 
 if __name__ == "__main__":
 	main()
