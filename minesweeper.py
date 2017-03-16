@@ -85,8 +85,8 @@ class Cell(object):
 		self._is_mine = bool(value)
 
 
-class Grid(object):
-	USE_CELL = True
+class Grid(object): # Todo: join mines and grid creation in one loop
+	USE_CELL = True # Implement __deepcopy__ for Grid and Cell
 	
 	def __init__(self, mines):
 		try:
@@ -95,6 +95,8 @@ class Grid(object):
 			raise TypeError("Sorry, mines didn't parse correctly.")
 		
 		self.reindex()
+		
+		self._visible = False
 	
 	@staticmethod
 	def _parse_args(mines):
@@ -133,7 +135,7 @@ class Grid(object):
 			for y in range(y_size):
 				temp = mines[x][y]
 				temp = bool(temp)
-				temp = Cell(temp, None, None)
+				temp = Cell(is_mine=temp, visible=False)
 				row.append(temp)
 			# grid[x][y] = temp
 			grid.append(row)
@@ -264,9 +266,9 @@ class RandomGridGenerator(object):
 class Game(object):  # NOT IMPLEMENTED
 	def __init__(self, grid, player):
 		raise NotImplementedError()
-		assert isinstance(player, Grid)
+		assert isinstance(grid, Grid)
 		assert isinstance(player, Player)
-		self.grid = grid
+		self.grid = grid # Should make copy.deepcopy of grid
 		self.player = player
 		self.x_size = self.grid.x_size
 		self.y_size = self.grid.y_size
