@@ -17,7 +17,7 @@ class Visibility(Enum):
 
 class Cell(object):
 	MINE_STR = 'X'
-	ZERO_STR = ' '
+	ZERO_STR = '_'
 	
 	def __init__(self, is_mine, neighbors=None, visible=None):
 		self.is_mine = is_mine
@@ -72,8 +72,8 @@ class Cell(object):
 		if value is None:
 			raise ValueError('Must not be None. Must be truthy or falsy value.')
 		self._is_mine = bool(value)
-		
-	def __str__(self):
+	
+	def print(self):
 		if self.is_mine:
 			return Cell.MINE_STR
 		if self.neighbors is None:
@@ -83,6 +83,13 @@ class Cell(object):
 		if self.neighbors is 0:
 			return Cell.ZERO_STR
 		return str(self.neighbors)
+	
+	def __str__(self):
+		if self.visible is Visibility.hidden:
+			return ' '
+		if self.visible is Visibility.flagged:
+			return '⚑'
+		return self.print()
 	
 	def __repr__(self):
 			return str(self) + ' ' + str(self.neighbors) + ' ' + str(self.visible)
@@ -108,7 +115,7 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 				row = []
 				for y in range(y_size):
 					tmp = bool(mines[x][y])
-					row.append(Cell(is_mine=tmp, visible=False))
+					row.append(Cell(is_mine=tmp, visible=Visibility.hidden))
 				grid.append(row)
 		
 		except (TypeError, IndexError, AssertionError):
@@ -166,6 +173,10 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 		new = self.__class__.__new__(self.__class__)
 		
 		new._grid = [[self.grid(x, y).copy() for y in range(self.y_size)] for x in range(self.x_size)]
+		new.x_size = self.x_size
+		new.y_size = self.y_size
+		
+		return new
 	
 	def reindex(self):
 		for x in range(self.x_size):
@@ -195,7 +206,23 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 					pass
 		
 		return neighbors
+	
+	def print(self):
+		g = str(self)
+		g = g.split('\n')
+		g = iter(g)
 
+		print('  ', end='')
+		for y in range(self.y_size):
+			print('  %s ' % str(y), end='')
+		print()
+
+		for x in range(self.x_size):  # only works with 1 char margins
+			print('  ' + next(g))
+			print(str(x) + ' ' + next(g))
+		print('  ' + next(g))
+		print()
+	
 
 def get_random() -> random.Random:  # assume random module is imported as random
 	return random.random.__self__  # Gets default random.Random() 
@@ -225,10 +252,7 @@ def randomize(x_size, y_size, mines, rand=None):
 
 class RandomGridGenerator(object):
 	def __init__(self, x, y, mines, state=None):
-		if state:
-			self.rand = random.Random(state)
-		else:
-			self.rand = get_random()
+		self.rand = random.Random(state) # If state==None, then will make random seed
 		
 		self.x, self.y, self.mines = x, y, mines
 	
@@ -244,15 +268,18 @@ class RandomGridGenerator(object):
 
 class Game(object):  # NOT IMPLEMENTED
 	def __init__(self, grid, player):
-		raise NotImplementedError()
 		assert isinstance(grid, Grid)
 		assert isinstance(player, Player)
-		self.grid = grid  # Should make copy.deepcopy of grid
+		
+		self.grid = grid.copy()  # Should make copy.deepcopy of grid
 		self.player = player
 		self.x_size = self.grid.x_size
 		self.y_size = self.grid.y_size
+	
+	def move(self):
+		move = self.player.move(self.grid)
+		move.apply(self.grid) # will not apply explosion for now
 		
-		self.mask = Grid(self.grid.mines)  # Create copy
 
 
 class Move(object):  # All grid manipulation logic here
@@ -312,8 +339,39 @@ class Player(object):
 			raise TypeError()
 		choice = self._move(grid)
 		
-		return MoveType(choice)
+		return Move(*choice)
 
+
+class HumanPlayer(Player):
+	def __init__(self):
+		super().__init__()
+		print("Move types:")
+		print("    Open = 1")
+		print("    Flag = 2")
+	
+	def _move(self, grid):
+		grid.print()
+		
+		while True:
+			try:
+				i = input("M, X, Y? ")
+				i = i.split()
+				
+				i[0], i[1], i[2] = int(i[0]), int(i[1]), int(i[2])
+				assert i[0] in (1, 2)
+				
+				assert 0 <= i[1] <= grid.x_size
+				assert 0 <= i[2] <= grid.y_size
+				
+			except (AssertionError, ValueError, IndexError):
+				pass
+			
+			else:
+				break
+		print(i)
+		#return Move(MoveType(i[0]), i[1], i[2])
+		return i
+			
 
 '''
 def main():
@@ -326,15 +384,15 @@ def main():
 		except:
 			#print("exception")
 			print(sys.exc_info())
-'''
+
 
 
 def main():
-	'''g = Grid([[0, 0, 0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 1, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 1, 0],
+	g = Grid([[0, 0, 0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 1, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 1, 0],
 			  [0, 0, 0, 0, 1, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0, 0],
 			  [0, 0, 1, 0, 0, 1, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0]])
 	g = Grid(randomize(9,9,10))
-	'''
+	
 	
 	while True:
 		i = input("? ")
@@ -347,9 +405,15 @@ def main():
 			# g = Grid([[0, 0, 1, 0], [1, 1, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]])
 			print(g)
 			print('\n')
-		# break
+'''
 
+def main():
+	h = Grid(RandomGridGenerator(9, 9, 10).next())	
+	
+	g = Game(h, HumanPlayer())
+	while True:
+		g.move()
+	
 
 if __name__ == "__main__":
 	main()
-	input()
