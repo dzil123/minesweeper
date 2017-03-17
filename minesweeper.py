@@ -5,10 +5,6 @@ import numpy as np
 from enum import Enum
 
 
-class WrongException(Exception):
-	pass
-
-
 class Visibility(Enum):
 	hidden = 0
 	flag = 1
@@ -36,23 +32,16 @@ class Cell(object):
 		else:
 			self._visible = visible
 	
+	def copy(self, *a, **k):
+		return self.__class__(self.is_mine, self.neighbors, self.visible)
+	
+	__copy__ = copy
+	__deepcopy__ = copy
+	
 	def __bool__(self):
 		return self.is_mine
 	
 	__nonzero__ = __bool__
-	
-	def __str__(self):
-		if self.is_mine:
-			return Cell.MINE_STR
-		if self.neighbors is None:
-			error = NotImplementedError('Incorrectly initialized Cell')
-			# error.x, error.y = self. #oops cells don't know their x, y
-			raise error
-		if self.neighbors is 0:
-			return Cell.ZERO_STR
-		return str(self.neighbors)
-	
-	__repr__ = __str__
 	
 	@property
 	def neighbors(self):
@@ -83,68 +72,54 @@ class Cell(object):
 		if value is None:
 			raise ValueError('Must not be None. Must be truthy or falsy value.')
 		self._is_mine = bool(value)
+		
+	def __str__(self):
+		if self.is_mine:
+			return Cell.MINE_STR
+		if self.neighbors is None:
+			error = NotImplementedError('Incorrectly initialized Cell')
+			# error.x, error.y = self. #oops cells don't know their x, y
+			raise error
+		if self.neighbors is 0:
+			return Cell.ZERO_STR
+		return str(self.neighbors)
+	
+	def __repr__(self):
+			return str(self) + ' ' + str(self.neighbors) + ' ' + str(self.visible)
+	
 
-
-class Grid(object): # Todo: join mines and grid creation in one loop
-	USE_CELL = True # Implement __deepcopy__ for Grid and Cell
+class Grid(object):  # Todo: join mines and grid creation in one loop
+	USE_CELL = True  # Implement __deepcopy__ for Grid and Cell
 	
 	def __init__(self, mines):
-		try:
-			self._mines, self._grid, self.x_size, self.y_size = self._parse_args(mines)
-		except (AssertionError, WrongException):
-			raise TypeError("Sorry, mines didn't parse correctly.")
+		self._grid, self.x_size, self.y_size = self._parse_args(mines)
 		
 		self.reindex()
-		
-		self._visible = False
 	
 	@staticmethod
 	def _parse_args(mines):
 		try:
-			mines = list(mines)
-			mines = [[bool(y) for y in x] for x in mines]
-		except TypeError:
-			raise WrongException('TypeError on parsing mines.')
+			x_size = len(mines)  # Total num. of objects in mine
+			y_size = len(mines[0])  # Num. of objects in first object in mine
+			
+			grid = []
+			for x in range(x_size):
+				assert len(mines[x]) == y_size  # make sure equal num of objects in every object of mine
+				row = []
+				for y in range(y_size):
+					tmp = bool(mines[x][y])
+					row.append(Cell(is_mine=tmp, visible=False))
+				grid.append(row)
 		
-		# ok so now is 2d tuple of True, False
-		# check to see if same dimensions
+		except (TypeError, IndexError, AssertionError):
+			# If any error, then raise error, so everything can be in one big try
+			raise ValueError('Could not parse mines.')
 		
-		assert isinstance(mines, list), "Not a tuple"
-		
-		# print(mines)
-		
-		x_size = len(mines)
-		
-		for x in mines:
-			assert isinstance(x, list), "Not a list"
-			for y in x:
-				assert isinstance(y, bool), "Not a bool %s" % str(y)
-		
-		try:
-			y_size = len(mines[0])
-		except IndexError:
-			raise WrongException('IndexError on getting "len" so did not tuple correctly')
-		
-		for x in mines:
-			assert len(x) == y_size, "Not same length"
-		# Done sanity checking # might not be necessary
-		
-		grid = []
-		for x in range(x_size):
-			row = []
-			for y in range(y_size):
-				temp = mines[x][y]
-				temp = bool(temp)
-				temp = Cell(is_mine=temp, visible=False)
-				row.append(temp)
-			# grid[x][y] = temp
-			grid.append(row)
-		
-		return mines, grid, x_size, y_size
+		return grid, x_size, y_size
 	
 	@property
 	def mines(self):
-		return self._mines
+		return [[bool(y) for y in x] for x in self.grid()]
 	
 	def grid(self, x=None, y=None):
 		if None in (x, y):
@@ -187,6 +162,11 @@ class Grid(object): # Todo: join mines and grid creation in one loop
 	
 	__repr__ = __str__
 	
+	def copy(self):
+		new = self.__class__.__new__(self.__class__)
+		
+		new._grid = [[self.grid(x, y).copy() for y in range(self.y_size)] for x in range(self.x_size)]
+	
 	def reindex(self):
 		for x in range(self.x_size):
 			for y in range(self.x_size):
@@ -199,7 +179,6 @@ class Grid(object): # Todo: join mines and grid creation in one loop
 		for x_ in [-1, 0, 1]:
 			# print('_x=%s'%str(x_))
 			for y_ in [-1, 0, 1]:
-				
 				if (x_ is 0) and (y is 0):  # faster than if not (x_ or y_)
 					continue  # avoid 0, 0 aka center square
 				try:
@@ -219,7 +198,7 @@ class Grid(object): # Todo: join mines and grid creation in one loop
 
 
 def get_random() -> random.Random:  # assume random module is imported as random
-	return random.random.__self__  # __self__ gets instance a bound method belongs to. Basically, get default random.Random()
+	return random.random.__self__  # Gets default random.Random() 
 
 
 def randomize(x_size, y_size, mines, rand=None):
@@ -268,7 +247,7 @@ class Game(object):  # NOT IMPLEMENTED
 		raise NotImplementedError()
 		assert isinstance(grid, Grid)
 		assert isinstance(player, Player)
-		self.grid = grid # Should make copy.deepcopy of grid
+		self.grid = grid  # Should make copy.deepcopy of grid
 		self.player = player
 		self.x_size = self.grid.x_size
 		self.y_size = self.grid.y_size
@@ -364,11 +343,11 @@ def main():
 		r = RandomGridGenerator(9, 9, 10, state=i)
 		
 		for x in range(3):
-			g = Grid(r.next())			#print(np.array(g.grid()))
-			#g = Grid([[0, 0, 1, 0], [1, 1, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]])
+			g = Grid(r.next())  # print(np.array(g.grid()))
+			# g = Grid([[0, 0, 1, 0], [1, 1, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]])
 			print(g)
 			print('\n')
-		#break
+		# break
 
 
 if __name__ == "__main__":
