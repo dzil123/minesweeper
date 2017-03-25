@@ -73,7 +73,7 @@ class Cell(object):
 			raise ValueError('Must not be None. Must be truthy or falsy value.')
 		self._is_mine = bool(value)
 	
-	def print(self):
+	def printt(self):
 		if self.is_mine:
 			return Cell.MINE_STR
 		if self.neighbors is None:
@@ -88,8 +88,8 @@ class Cell(object):
 		if self.visible is Visibility.hidden:
 			return ' '
 		if self.visible is Visibility.flagged:
-			return '⚑'
-		return self.print()
+			return 'F' #''
+		return self.printt()
 	
 	def __repr__(self):
 			return str(self) + ' ' + str(self.neighbors) + ' ' + str(self.visible)
@@ -184,7 +184,7 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 				if not self.grid(x, y).is_mine:
 					self.grid(x, y).neighbors = self.get_neighbors(x, y)
 	
-	def get_neighbors(self, x, y) -> list:
+	def get_neighbors(self, x, y):# -> list:
 		neighbors = 0
 		
 		for x_ in [-1, 0, 1]:
@@ -206,8 +206,8 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 					pass
 		
 		return neighbors
-	
-	def print(self):
+	'''
+	def printt(self):
 		g = str(self)
 		g = g.split('\n')
 		g = iter(g)
@@ -224,7 +224,7 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 		print()
 	
 
-def get_random() -> random.Random:  # assume random module is imported as random
+def get_random():# -> random.Random:  # assume random module is imported as random
 	return random.random.__self__  # Gets default random.Random() 
 
 
@@ -374,6 +374,7 @@ class HumanPlayer(Player):
 			
 
 '''
+
 def main():
 	import sys
 	while True:
