@@ -32,8 +32,11 @@ class Cell(object):
 		else:
 			self._visible = visible
 	
-	def copy(self, *a, **k):
-		return self.__class__(self.is_mine, self.neighbors, self.visible)
+	def copy(self, reset_visibility=True):
+		visible = self.visible
+		if reset_visibility:
+			visible = Visibility.hidden
+		return self.__class__(self.is_mine, self.neighbors, visible)
 	
 	__copy__ = copy
 	__deepcopy__ = copy
@@ -169,11 +172,11 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 	
 	__repr__ = __str__
 	
-	def copy(self):
+	def copy(self, reset_visibility=True):
 		new = self.__class__.__new__(self.__class__)
 		
-		new._grid = [[self.grid(x, y).copy() for y in range(self.y_size)] for x in range(self.x_size)]
-		new.x_size = self.x_size
+		new._grid = [[self.grid(x, y).copy(reset_visibility) for y in range(self.y_size)] for x in range(self.x_size)]
+		new.x_size = self.x_size # bypasses long parse_args
 		new.y_size = self.y_size
 		
 		return new
@@ -223,6 +226,41 @@ class Grid(object):  # Todo: join mines and grid creation in one loop
 		print('  ' + next(g))
 		print()
 	
+	@property
+	def open(self):
+		o = []
+		for x in range(self.x_size):
+			for y in range(self.y_size):
+				if self.grid(x, y).visible is Visibility.open:
+					o.append(self.grid(x, y))
+		
+		return o
+	
+	@property
+	def unopened(self):
+		o = []
+		for x in range(self.x_size):
+			for y in range(self.y_size):
+				cell = self.grid(x, y)
+				if not (cell.visible is Visibility.open) and (cell.is_mine == False):
+					o.append(self.grid(x, y))
+
+		return o
+	
+	@property
+	def total(self):
+		return self.x_size * self.y_size
+	
+	@property
+	def mines(self):
+		o = []
+		for x in range(self.x_size):
+			for y in range(self.y_size):
+				cell = self.grid(x, y)
+				if cell.is_mine == True:
+					o.append(self.grid(x, y))
+
+		return o
 
 def get_random() -> random.Random:  # assume random module is imported as random
 	return random.random.__self__  # Gets default random.Random() 
@@ -275,22 +313,49 @@ class Game(object):  # NOT IMPLEMENTED
 		self.player = player
 		self.x_size = self.grid.x_size
 		self.y_size = self.grid.y_size
+		
+		#print(self.total, self.need_to_open, self.open)
 	
 	def move(self):
-		move = self.player.move(self.grid)
-		move.apply(self.grid) # will not apply explosion for now
+		self.check_win()
 		
-
+		move = self.player.move(self.grid) # TODO: add already visited to move.apply
+		opened = move.apply(self.grid) # will not apply explosion for now
+		
+		self.check_win()
+	
+	def check_win(self, error=True):
+		if len(self.grid.open) < 0 or len(self.grid.open) > (self.grid.total1 0 - len(self.grid.mines)):
+			raise NotImplementedError("open: %s need: %s" % \
+				str(len(self.grid.open)), str(len(self.grid.unopened))) # sanity check
+		
+		if len(self.grid.unopened) == 0:
+			if error:
+				raise Win(self)
+			return True
+		
+		return False
+	
+	def mainloop(self):
+		self.check_win() # can't play if already won
+		
+		try:
+			while True:
+				self.move()
+		except Explosion as e:
+			self.player.lose(e)
+		except Win as e:
+			self.player.win(e)
 
 class Move(object):  # All grid manipulation logic here
 	def __init__(self, move_type, x, y):
 		self.type = MoveType(move_type)
 		x, y = int(x), int(y)
 		if (x < 0) or (y < 0):
-			raise ValueError('Out of range ints')
+			raise IndexError('Out of range ints')
 		self.x, self.y = x, y
 	
-	def apply(self, grid):
+	def apply(self, grid, visit=[]):
 		if not isinstance(grid, Grid):
 			raise TypeError('grid must be type Grid')
 		if (self.x >= grid.x_size) or (self.y >= grid.y_size):
@@ -299,9 +364,37 @@ class Move(object):  # All grid manipulation logic here
 		cell = grid.grid(self.x, self.y)
 		
 		if self.type == MoveType.open:
+			#self.visited = []
+			if cell.visible in (Visibility.visible, Visibility.flag):
+				return visit # Not going to open already open or flagged
 			cell.visible = Visibility.visible
 			if cell.is_mine:
-				raise Explosion(self.x, self.y)
+				raise Explosion(self.x, self.y, grid)
+			visit.append(cell)
+			if cell.neighbors == 0 and cell.is_mine == False:
+				#visit = []
+				print("Starting", self.x, self.y)
+				for X in [-1, 0, 1]:
+					for Y in [-1, 0, 1]:
+						x, y = self.x + X, self.y + Y
+						if (x, y) == (0, 0) or x < 0 or y < 0:
+							continue
+						print(x, y)
+						try:
+							a = grid.grid(x, y)
+						except IndexError:
+							continue
+						if [x, y] in visit:
+							continue
+						if grid.grid(x, y).is_mine:
+							continue
+						#visit.append([x, y])
+						visit = Move(MoveType.open, x, y).apply(grid, visit)
+						print("yes")
+						#visit.append([x, y])
+				
+			return visit
+		
 		elif self.type == MoveType.flag:
 			if cell.visible == Visibility.open:
 				return  # invalid command. Cannot flag if opened
@@ -317,22 +410,36 @@ class Move(object):  # All grid manipulation logic here
 
 
 class Explosion(Exception):
-	def __init__(self, x, y, *a, **k):
+	def __init__(self, x, y, move, *a, **k):
 		self.x, self.y = x, y  # Store (x, y) for Game to use
+		self.move = move
 		super().__init__(*a, **k)
 
+class Win(Exception):
+	def __init__(self, grid, *a, **k):
+		self.grid = grid
+		super().__init__(*a, **k)
 
 class MoveType(Enum):
 	open = 1
 	flag = 2
 
 
-class Player(object):
-	def __init__(self):  # Override me
+class Player(object): # Override every function
+	def __init__(self):
 		pass
 	
+	def lose(self, e):
+		x, y = str(e.x), str(e.y)
+		print("You Lose: (%s, %s)" % (x, y))
+	
+	def win(self, e):
+		x, y = e.grid.x_size, e.grid.y_size
+		x, y = str(x), str(y)
+		print("You Win: (%sx%s)" % (x, y))
+	
 	def _move(self, grid):
-		raise NotImplementedError()  # Override me
+		raise NotImplementedError()
 	
 	def move(self, grid):  # Do Not Override
 		if not isinstance(grid, Grid):
@@ -371,7 +478,6 @@ class HumanPlayer(Player):
 		print(i)
 		#return Move(MoveType(i[0]), i[1], i[2])
 		return i
-			
 
 '''
 def main():
@@ -411,8 +517,7 @@ def main():
 	h = Grid(RandomGridGenerator(9, 9, 10).next())	
 	
 	g = Game(h, HumanPlayer())
-	while True:
-		g.move()
+	g.mainloop()
 	
 
 if __name__ == "__main__":
