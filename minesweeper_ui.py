@@ -1,10 +1,45 @@
 #!/usr/bin/python3
 
 from minesweeper import *
+import minesweeper
 from tkinter import *
-from enum import Enum
-import random
+#from enum import Enum
+#import random
+import threading
+import queue
 
+#class GameThread(threading.Thread, Player):
+class GameThread(Player):
+	def __init__(self):
+		#threading.Thread.__init__(self, args=a, kwargs=k)
+		super().__init__()
+		#self.game = game
+		self.app = None
+		self.queue = queue.Queue()
+		self.lock = threading.Lock()
+		#self.lock1 = threading.Lock()
+		#self.daemon = False # i dont know what im doing
+	
+	#def lose(self, e):
+	#	self.app.lose()
+	
+	#def win(self, e):
+	#	self.app.win()
+	
+	def _move(self, grid):
+		#with self.lock:
+		self.app.update_grid(grid)
+		val = self.queue.get()
+		with self.lock:
+			return val
+	
+	#def run(self):
+	def send_move(self, move):
+		with self.lock:
+			self.queue.put(move)
+		
+		#return self.grid
+		
 #size = 8
 bd = 2
 #	  #RGB
@@ -157,10 +192,32 @@ class Tile(Button):
 			self.bind(x, callback)
 
 class App(Frame):
-	def __init__(self, tk):
+	def __init__(self, tk, player, grid):
 		super().__init__(tk, bg=color) # "#888"
+		self.x_size, self.y_size = 9, 9
+		self.player = player
+		self._grid = grid
 		self.load_images()
 		self.make_widgets()
+		self.player.app = self
+	
+	#def move(self, grid):
+	#	assert grid.x_size == 9
+	#	assert grid.y_size == 9
+	#	
+	#	self.grid = grid
+	
+	def redraw(self):
+		class Event(object):
+			type = EventType.ButtonRelease
+			num = 1
+		
+		for x in range(self.x_size):
+			for y in range(self.y_size):
+				self.buttons[x][y]["image"] = self.get_image(x, y)
+				if self._grid.grid(x, y).visible == Visibility.open:
+					self.buttons[x][y].state = True
+					self.buttons[x][y].generate_callback()(Event())
 	
 	def load_images(self):
 		pass
@@ -170,17 +227,42 @@ class App(Frame):
 	
 	def get_image(self, x, y):
 		# This is where you get appropriate image from Game, or grid, or whatever
-		return Images.i_1
+		cell = self._grid.grid(x, y)
+		if cell.visible == Visibility.hidden:
+			return Images.blank
+		if cell.visible == Visibility.flag:
+			return Images.flag
+		m, n = cell.is_mine, cell.neighbors
+		if m:
+			return Images.mine
+		if n == 0:
+			return Images.blank
+		if n == 1:
+			return Images.i_1
+		if n == 2:
+			return Images.i_2
+		if n == 3:
+			return Images.i_3
+		return Images.flag
+	
+	def update_grid(self, grid):
+		self._grid = grid
+		self.redraw()
 	
 	def l_press(self, x, y):
 		print("Left: (%s, %s)" % (str(x), str(y)))
 		
-		image = self.get_image(x, y)
-		self.buttons[x][y].config(image=image)
+		#self.redraw()
+		
+		#image = self.get_image(x, y)
+		#self.buttons[x][y].config(image=image)
 		#self.buttons[x][y].grid(ipadx=1, ipady=1)
+		
+		self.player.send_move([MoveType.open, x, y])
 	
 	def r_press(self, x, y):
 		print("Right: (%s, %s)" % (str(x), str(y)))
+		self.player.send_move([MoveType.flag, x, y])
 	
 	def make_button_grid(self, x_size=9, y_size=9, x_offset=None, y_offset=None):
 		x_size, y_size = int(x_size), int(y_size)		
@@ -208,13 +290,29 @@ class App(Frame):
 	
 	def make_button(self, x, y):
 		return Tile(self, x, y)
-		
+
+class Game2(threading.Thread):
+	def __init__(self, game):
+		self.game = game
+		super().__init__()
+	
+	def run(self):
+		self.game.mainloop()
 
 def main():
 	#tk = Tk()
 	#image = PhotoImage()
-	app = App(t)
+	grid_generator = RandomGridGenerator(9, 9, 10)
+	print(grid_generator)
+	grid = grid_generator.next()
+	print(grid)
+	grid = minesweeper.Grid(grid)
+	print(grid)
+	player = GameThread()
+	game = Game(grid, player)
+	app = App(t, player, grid)
 	app.grid()
+	Game2(game).start()
 	t.mainloop()
 
 if __name__ == "__main__":

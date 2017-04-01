@@ -325,7 +325,7 @@ class Game(object):  # NOT IMPLEMENTED
 		self.check_win()
 	
 	def check_win(self, error=True):
-		if len(self.grid.open) < 0 or len(self.grid.open) > (self.grid.total1 0 - len(self.grid.mines)):
+		if len(self.grid.open) < 0 or len(self.grid.open) > (self.grid.total - len(self.grid.mines)):
 			raise NotImplementedError("open: %s need: %s" % \
 				str(len(self.grid.open)), str(len(self.grid.unopened))) # sanity check
 		
